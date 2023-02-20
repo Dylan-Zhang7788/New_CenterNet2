@@ -67,3 +67,6 @@ _darcs
 my_log/train.log
 eval_COCO/
 img
+datasets
+datasets/README.md
+datasets/README.md
