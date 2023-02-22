@@ -199,7 +199,7 @@ class CenterNet(nn.Module):
 
         # reg_pred_per_level: list，level数个 [batch数,channel,h，w]
         # 这样就得到了每个level的特征图尺寸
-        # 得到的 shapes_per_level 是[level数,2]
+        # 得到的 shapes_per_level 是[level数,2] 2 表示两个维度 分别是特征图的长和宽
         shapes_per_level = grids[0].new_tensor(
                     [(x.shape[2], x.shape[3]) for x in reg_pred_per_level])
         
@@ -208,6 +208,10 @@ class CenterNet(nn.Module):
                 images, clss_per_level, reg_pred_per_level, 
                 agn_hm_pred_per_level, grids)
         else:
+            # 这里的pos_inds为所有真值的索引，一维数组，假设shape=[X]，X不一定是几，笔记里写的清楚
+            # 这里的labels全是0，一维数组，shape=[X]，与pos_inds一致，因为这里不涉及到类别的预测
+            # reg_targets，shape=[M，4]，M为网格的总数目(看笔记)，4表示4个维度
+            # flattened_hms，shape=[M，1]，M为网格的总数目(看笔记)，1表示1张特征图
             pos_inds, labels, reg_targets, flattened_hms = \
                 self._get_ground_truth(
                     grids, shapes_per_level, gt_instances)
@@ -386,7 +390,7 @@ class CenterNet(nn.Module):
 
         # get positive pixel index
         if not self.more_pos:# 这个东西的默认值是false
-            # 得到的东西是 真值center坐标的索引，还要真值的列表
+            # 得到的东西是 真值center坐标的索引，还有真值的列表
             pos_inds, labels = self._get_label_inds(
                 gt_instances, shapes_per_level)
                 # shapes_per_level 是[level数,2]
