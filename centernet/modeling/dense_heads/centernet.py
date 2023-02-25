@@ -304,6 +304,8 @@ class CenterNet(nn.Module):
             losses['loss_centernet_neg'] = neg_loss
         # torch.nonzero 输出的非零元素的索引，这里squeeze是减少他的维度
         # reg_inds的维数，是pos_inds维数的9倍
+        # 提取第一个维度上面最大的一个数字，也就是ltrb四个里面最大的
+        # 因为没有真值的地方都是负无穷，提取出最大的还是负无穷，这样做的目的就是压缩维度
         reg_inds = torch.nonzero(reg_targets.max(dim=1)[0] >= 0).squeeze(1)
         # 再用索引把预测值给取出来
         reg_pred = reg_pred[reg_inds]
@@ -516,7 +518,8 @@ class CenterNet(nn.Module):
         # 这些点按照顺序排在一起，但是是并在了一个维度里
         reg_targets = _transpose(reg_targets, num_loc_list)
         flattened_hms = _transpose(flattened_hms, num_loc_list)
-        # 除以一下步长
+
+        # !!!!!!  除以一下步长  !!!!!!!!
         for l in range(len(reg_targets)):
             reg_targets[l] = reg_targets[l] / float(self.strides[l])
         # 再把他们的所有维度连起来
@@ -626,6 +629,7 @@ class CenterNet(nn.Module):
             reg_targets_per_im: M x N x 4
             size_ranges: M x 2
         '''
+        aaa=size_ranges[:, [1]]
         # (l+r)^2+(t+b)^2 开根号除以二 不知道算了个啥 对角线的一半？
         crit = ((reg_targets_per_im[:, :, :2] + \
             reg_targets_per_im[:, :, 2:])**2).sum(dim=2) ** 0.5 / 2 # M x N
