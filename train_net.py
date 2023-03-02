@@ -48,6 +48,7 @@ from centernet.MY_evaluation.MY_coco_evaluation import MY_COCOEvaluator
 from centernet.MY_evaluation.MY_pascal_voc_evaluation import MY_PascalVOCDetectionEvaluator
 from centernet.MY_datasets.MY_pascal_voc import MY_register
 from centernet.MY_datasets.MY_balloon import MY_register_balloon
+from centernet.atss_config import add_atss_config
 
 logger = logging.getLogger("detectron2")
 MY_register()
@@ -78,6 +79,7 @@ def setup(args):  # 根据arg得到cfg的一个函数
     """
     cfg = get_cfg()   # 加载默认的config 
     add_centernet_config(cfg)   # 添加centernet的config
+    add_atss_config(cfg)
     cfg.merge_from_file(args.config_file)  # 从config_file里合并一部分参数进来
     cfg.merge_from_list(args.opts)  # 自己设置的参数 再通过opt合并进来
     if '/auto' in cfg.OUTPUT_DIR:
