@@ -83,7 +83,7 @@ class ATSSLossComputation(object):
             targets_per_im = targets[im_i]   # 每张图里的真值样本框的数量 不一定是多少 假设形状是[N,4]
             # assert targets_per_im.mode == "xyxy"
             bboxes_per_im = targets_per_im.gt_boxes.tensor
-            labels_per_im = targets_per_im.gt_classes
+            labels_per_im = targets_per_im.gt_classes+1 # 不知道coco有没有第0类
             # anchors 5个尺度上的每一个点上都有一个anchor()
             anchors_per_im = cat_boxlist(anchors[im_i])
             num_gt = bboxes_per_im.shape[0]

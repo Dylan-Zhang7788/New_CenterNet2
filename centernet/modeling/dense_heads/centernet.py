@@ -249,6 +249,7 @@ class CenterNet(nn.Module):
                     proposals[p].remove('pred_boxes')
                     proposals[p].remove('scores')
                     proposals[p].remove('pred_classes')
+                    # proposals[p].remove('objectness_logits') 
 
             if self.debug:
                 debug_train(
