@@ -92,7 +92,7 @@ def boxlist_iou(boxlist1, boxlist2):
     Reference:
       https://github.com/chainer/chainercv/blob/master/chainercv/utils/bbox/bbox_iou.py
     """
-    if boxlist1.size != boxlist2.size:
+    if boxlist1.size != boxlist2.image_size:
         raise RuntimeError(
                 "boxlists should have same image size, got {}, {}".format(boxlist1, boxlist2))
 
@@ -100,9 +100,11 @@ def boxlist_iou(boxlist1, boxlist2):
     M = len(boxlist2)
 
     area1 = boxlist1.area()
-    area2 = boxlist2.area()
+    # area2 = boxlist2.area()
+    # box1, box2 = boxlist1.bbox, boxlist2.gt_boxes.tensor
+    area2 = (boxlist2.gt_boxes.tensor[:, 2] - boxlist2.gt_boxes.tensor[:, 0] + 1) * (boxlist2.gt_boxes.tensor[:, 3] - boxlist2.gt_boxes.tensor[:, 1] + 1)
 
-    box1, box2 = boxlist1.bbox, boxlist2.bbox
+    box1, box2 = boxlist1.bbox, boxlist2.gt_boxes.tensor
 
     lt = torch.max(box1[:, None, :2], box2[:, :2])  # [N,M,2]
     rb = torch.min(box1[:, None, 2:], box2[:, 2:])  # [N,M,2]

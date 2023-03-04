@@ -120,7 +120,7 @@ class AnchorGenerator(nn.Module):
             anchors_in_image = []
             for anchors_per_feature_map in anchors_over_all_feature_maps:
                 boxlist = BoxList(
-                    anchors_per_feature_map, (image_width, image_height), mode="xyxy"
+                    anchors_per_feature_map, (image_height, image_width), mode="xyxy"
                 )
                 self.add_visibility_to(boxlist)
                 anchors_in_image.append(boxlist)
