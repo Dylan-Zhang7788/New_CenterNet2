@@ -52,3 +52,8 @@ def MY_register_balloon():
     for d in ['train','val']:  #注册数据集
         DatasetCatalog.register('balloon_'+d,lambda d=d: get_balloon_dicts('datasets/balloon/'+d))
         MetadataCatalog.get('balloon_'+d).set(thing_classes=['balloon'])
+
+def MY_register_balloon_one():
+    for d in ['train','val']:  #注册数据集
+        DatasetCatalog.register('balloon_one_'+d,lambda d=d: get_balloon_dicts('datasets/balloon_one/'+d))
+        MetadataCatalog.get('balloon_one_'+d).set(thing_classes=['balloon'])

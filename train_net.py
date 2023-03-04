@@ -47,12 +47,13 @@ from centernet.data.custom_build_augmentation import build_custom_augmentation
 from centernet.MY_evaluation.MY_coco_evaluation import MY_COCOEvaluator
 from centernet.MY_evaluation.MY_pascal_voc_evaluation import MY_PascalVOCDetectionEvaluator
 from centernet.MY_datasets.MY_pascal_voc import MY_register
-from centernet.MY_datasets.MY_balloon import MY_register_balloon
+from centernet.MY_datasets.MY_balloon import MY_register_balloon,MY_register_balloon_one
 from centernet.atss_config import add_atss_config
 
 logger = logging.getLogger("detectron2")
 MY_register()
 MY_register_balloon()
+MY_register_balloon_one()
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def default_argument_parser(epilog=None):
