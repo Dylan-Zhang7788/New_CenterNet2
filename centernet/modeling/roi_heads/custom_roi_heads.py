@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch.autograd.function import Function
 from typing import Dict, List, Optional, Tuple, Union
+import cv2
 
 from detectron2.layers import ShapeSpec
 from detectron2.structures import Boxes, Instances, pairwise_iou
@@ -171,6 +172,24 @@ class CustomCascadeROIHeads(CascadeROIHeads):
         '''
         enable debug
         '''
+        # images=images.tensor.squeeze(0).permute(1,2,0).cpu()
+        # images=np.ascontiguousarray(images)
+        # # 画出proposal
+        # for i,proposal in enumerate(proposals[0].proposal_boxes.tensor):
+        #     proposal=np.ascontiguousarray(proposal.cpu())
+        #     pt1=(int(proposal[0]),int(proposal[1]))
+        #     pt2=(int(proposal[2]),int(proposal[3]))
+        #     cv2.rectangle(images,pt1,pt2,3)
+        #     cv2.imshow('ttt',images)
+        #     cv2.waitKey(0)
+        # 画出真值
+        # for i,target in enumerate(targets[0].gt_boxes.tensor):
+        #     target=np.ascontiguousarray(target.cpu())
+        #     pt1=(int(target[0]),int(target[1]))
+        #     pt2=(int(target[2]),int(target[3]))
+        #     cv2.rectangle(images,pt1,pt2,3)
+        # cv2.imshow('ttt',images)
+        # cv2.waitKey(0)
         if not self.debug:
             del images
         if self.training:

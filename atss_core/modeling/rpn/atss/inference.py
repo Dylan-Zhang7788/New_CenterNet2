@@ -4,7 +4,7 @@ from atss_core.structures.bounding_box import BoxList
 from atss_core.structures.boxlist_ops import cat_boxlist
 from atss_core.structures.boxlist_ops import boxlist_ml_nms
 from atss_core.structures.boxlist_ops import remove_small_boxes
-
+from detectron2.structures import Instances, Boxes
 
 class ATSSPostProcessor(torch.nn.Module):
     def __init__(
@@ -76,7 +76,8 @@ class ATSSPostProcessor(torch.nn.Module):
             boxlist = boxlist.clip_to_image(remove_empty=False)
             boxlist = remove_small_boxes(boxlist, self.min_size)
             results.append(boxlist)
-
+            # proposal_list=Instances()
+            # proposal_list.pred_boxes=1
         return results
 
     def forward(self, box_cls, box_regression, centerness, anchors):
@@ -128,7 +129,8 @@ def make_atss_postprocessor(config, box_coder):
         nms_thresh=config.MODEL.ATSS.NMS_TH,
         fpn_post_nms_top_n=config.TEST.DETECTIONS_PER_IMG,
         min_size=0,
-        num_classes=config.MODEL.ATSS.NUM_CLASSES,
+        # num_classes=config.MODEL.ATSS.NUM_CLASSES,
+        num_classes=1, # 这里有修改 让类别全是1
         bbox_aug_enabled=config.TEST.BBOX_AUG.ENABLED,
         box_coder=box_coder,
         bbox_aug_vote=config.TEST.BBOX_AUG.VOTE

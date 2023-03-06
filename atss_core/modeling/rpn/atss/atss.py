@@ -101,7 +101,8 @@ class ATSSHead(torch.nn.Module):
     def __init__(self, cfg, in_channels):
         super(ATSSHead, self).__init__()
         self.cfg = cfg
-        num_classes = cfg.MODEL.ATSS.NUM_CLASSES - 1
+        # num_classes = cfg.MODEL.ATSS.NUM_CLASSES - 1
+        num_classes = 1 # 后面改的 写了固定值 只有正样本这一个类别
         num_anchors = len(cfg.MODEL.ATSS.ASPECT_RATIOS) * cfg.MODEL.ATSS.SCALES_PER_OCTAVE
         in_channels=160 # 这个地方写了固定值后面出错的话要改
 

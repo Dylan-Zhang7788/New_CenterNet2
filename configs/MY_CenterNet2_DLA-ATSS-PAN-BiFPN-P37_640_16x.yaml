@@ -18,6 +18,8 @@ MODEL:
     POSITIVE_TYPE: 'ATSS' # how to select positves: ATSS (Ours) , SSC (FCOS), IoU (RetinaNet)
     TOPK: 9 # topk for selecting candidate positive samples from each level
     REGRESSION_TYPE: 'BOX' # regressing from a 'BOX' or a 'POINT'
+    INFERENCE_TH: 0.01 # 这两个参数后期要调整
+    PRE_NMS_TOP_N: 2000
   WEIGHTS: ''
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.12, 57.375]

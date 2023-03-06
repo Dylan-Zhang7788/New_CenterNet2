@@ -47,7 +47,9 @@ class MY_ATSSModule(torch.nn.Module):
             "loss_reg": loss_box_reg,
             "loss_centerness": loss_centerness
         }
-        return None, losses
+        boxes=self._forward_test(box_cls, box_regression, centerness,anchors)
+        proposal=1
+        return proposal, losses
 
     def _forward_test(self, box_cls, box_regression, centerness, anchors):
         boxes = self.box_selector_test(box_cls, box_regression, centerness, anchors)
