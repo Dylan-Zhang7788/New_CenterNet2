@@ -87,6 +87,12 @@ class ATSSLossComputation(object):
             # anchors 5个尺度上的每一个点上都有一个anchor()
             anchors_per_im = cat_boxlist(anchors[im_i])
             num_gt = bboxes_per_im.shape[0]
+            if num_gt == 0: 
+                cls_labels_per_im=torch.zeros((anchors_per_im.bbox.shape[0])).cuda()
+                reg_targets_per_im=torch.zeros_like(anchors_per_im.bbox).cuda()
+                cls_labels.append(cls_labels_per_im)
+                reg_targets.append(reg_targets_per_im)
+                continue
 
             if self.cfg.MODEL.ATSS.POSITIVE_TYPE == 'SSC':
                 object_sizes_of_interest = [[-1, 64], [64, 128], [128, 256], [256, 512], [512, INF]]
