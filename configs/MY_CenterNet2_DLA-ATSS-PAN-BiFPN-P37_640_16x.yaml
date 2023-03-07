@@ -3,7 +3,8 @@ MODEL:
   PROPOSAL_GENERATOR:
     NAME: "MY_ATSSModule"
   BACKBONE:
-    NAME: "MY_build_p37_fcos_dla_bifpn_backbone"
+    # NAME: "MY_build_p37_fcos_dla_bifpn_backbone"
+    NAME: "build_p37_dla_bifpn_backbone"
   BIFPN:
     OUT_CHANNELS: 160
     NUM_LEVELS: 5
