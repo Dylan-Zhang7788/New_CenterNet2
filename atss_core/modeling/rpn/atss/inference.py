@@ -5,6 +5,7 @@ from atss_core.structures.boxlist_ops import cat_boxlist
 from atss_core.structures.boxlist_ops import boxlist_ml_nms
 from atss_core.structures.boxlist_ops import remove_small_boxes
 from detectron2.structures import Instances, Boxes
+from centernet.modeling.layers.ml_nms import ml_nms
 
 class ATSSPostProcessor(torch.nn.Module):
     def __init__(
@@ -29,7 +30,34 @@ class ATSSPostProcessor(torch.nn.Module):
         self.bbox_aug_enabled = bbox_aug_enabled
         self.box_coder = box_coder
         self.bbox_aug_vote = bbox_aug_vote
+        self.nms_thresh_train=0.9
+        self.nms_thresh_test=0.9
+        self.post_nms_topk_train=2000
+        self.post_nms_topk_test=128
 
+    @torch.no_grad()
+    def nms_and_topK(self, boxlists, nms=True):
+        num_images = len(boxlists)
+        results = []
+        for i in range(num_images):
+            nms_thresh = self.nms_thresh_train if self.training else \
+                self.nms_thresh_test
+            result = ml_nms(boxlists[i], nms_thresh) if nms else boxlists[i]
+            num_dets = len(result)
+            post_nms_topk = self.post_nms_topk_train if self.training else \
+                self.post_nms_topk_test
+            if num_dets > post_nms_topk:
+                cls_scores = result.scores
+                image_thresh, _ = torch.kthvalue(
+                    cls_scores.float().cpu(),
+                    num_dets - post_nms_topk + 1
+                )
+                keep = cls_scores >= image_thresh.item()
+                keep = torch.nonzero(keep).squeeze(1)
+                result = result[keep]
+            results.append(result)
+        return results
+    
     def forward_for_single_feature_map(self, box_cls, box_regression, centerness, anchors):
         N, _, H, W = box_cls.shape
         A = box_regression.size(1) // 4
@@ -75,9 +103,10 @@ class ATSSPostProcessor(torch.nn.Module):
             boxlist.add_field("scores", torch.sqrt(per_box_cls))
             boxlist = boxlist.clip_to_image(remove_empty=False)
             boxlist = remove_small_boxes(boxlist, self.min_size)
-            results.append(boxlist)
-            # proposal_list=Instances()
-            # proposal_list.pred_boxes=1
+            proposal_list=Instances(per_anchors.size)
+            proposal_list.proposal_boxes=Boxes(boxlist.bbox)
+            proposal_list.scores=boxlist.extra_fields['scores']
+            results.append(proposal_list)
         return results
 
     def forward(self, box_cls, box_regression, centerness, anchors):
@@ -89,9 +118,8 @@ class ATSSPostProcessor(torch.nn.Module):
             )
 
         boxlists = list(zip(*sampled_boxes))
-        boxlists = [cat_boxlist(boxlist) for boxlist in boxlists]
-        if not (self.bbox_aug_enabled and not self.bbox_aug_vote):
-            boxlists = self.select_over_all_levels(boxlists)
+        boxlists = [Instances.cat(boxlist) for boxlist in boxlists]
+        boxlists = self.nms_and_topK(boxlists)
 
         return boxlists
 
