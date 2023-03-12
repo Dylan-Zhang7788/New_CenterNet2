@@ -61,13 +61,12 @@ def get_parser():
     parser.add_argument(
         "--confidence-threshold",
         type=float,
-        default=0.7,
+        default=0.6,
         help="Minimum score for instance predictions to be shown",
     )
     parser.add_argument(
         "--opts",
         help="Modify config options using the command-line 'KEY VALUE' pairs",
-        default=['MODEL.WEIGHTS' ,'./output/CenterNet2/CenterNet2_R50_1x/model_final.pth'],
         nargs=argparse.REMAINDER,
     )
     return parser
