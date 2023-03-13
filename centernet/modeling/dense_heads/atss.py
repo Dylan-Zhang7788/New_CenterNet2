@@ -43,9 +43,9 @@ class MY_ATSSModule(torch.nn.Module):
             box_cls, box_regression, centerness, targets, anchors
         )
         losses = {
-            "loss_cls": loss_box_cls,
-            "loss_reg": loss_box_reg,
-            "loss_centerness": loss_centerness
+            "loss_cls": loss_box_cls*0.8,
+            "loss_reg": loss_box_reg*0.8,
+            "loss_centerness": loss_centerness*0.8
         }
         proposals,_=self._forward_test(box_cls, box_regression, centerness,anchors)
         
