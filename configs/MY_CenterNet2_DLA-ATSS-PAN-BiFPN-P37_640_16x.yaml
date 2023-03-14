@@ -1,7 +1,7 @@
 _BASE_: "Base-CenterNet2.yaml"
 MODEL:
   PROPOSAL_GENERATOR:
-    NAME: "MY_ATSSModule"
+    NAME: "MY_GFLModule"
   BACKBONE:
     # NAME: "MY_build_p37_fcos_dla_bifpn_backbone"
     NAME: "build_p37_dla_bifpn_backbone"

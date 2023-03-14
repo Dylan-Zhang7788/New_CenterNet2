@@ -31,9 +31,9 @@ class ATSSPostProcessor(torch.nn.Module):
         self.box_coder = box_coder
         self.bbox_aug_vote = bbox_aug_vote
         self.nms_thresh_train=0.9
-        self.nms_thresh_test=0.9
+        self.nms_thresh_test=0.8 # 0.8的效果是最好的(2023.3.13记)
         self.post_nms_topk_train=2000
-        self.post_nms_topk_test=128
+        self.post_nms_topk_test=200 # 200的效果要好于128 好于150 (2023.3.13记)
 
     @torch.no_grad()
     def nms_and_topK(self, boxlists, nms=True):
