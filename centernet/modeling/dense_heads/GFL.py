@@ -10,6 +10,7 @@ from atss_core.structures.bounding_box import BoxList
 from atss_core.structures.boxlist_ops import boxlist_iou
 from atss_core.structures.boxlist_ops import cat_boxlist
 from .MY_mm_func import images_to_levels,  anchor_inside_flags, unmap
+from .....mmdetection.mmdet.core.bbox.assigners.atss_assigner import ATSSAssigner
 
 INF = 100000000
 
@@ -223,6 +224,7 @@ class MY_GFLModule(torch.nn.Module):
         in_channels=160 # 这个地方写了固定值后面出错的话要改
         self.box_coder = BoxCoder(cfg)
         self.anchor_generator = make_anchor_generator_gfl(cfg)
+        self.assigner=ATSSAssigner(topk=9)
         '''
         下面是我补充的GFL
         '''
