@@ -999,6 +999,15 @@ class MY_GFLModule(torch.nn.Module):
         else:
             return mlvl_bboxes, mlvl_scores, mlvl_labels
 
+    def conver_proposals(self,images,proposal):
+        result=[]
+        for i in range(len(proposal)):
+            boxlist = Instances(images[i].size())
+            boxes = proposal[i][0]
+            boxlist.proposal_boxes = Boxes(boxes[:,:4])
+            result.append(boxlist)
+        return result
+
     def forward(self, images, features_dict, targets=None):
         features = [features_dict[f] for f in self.in_features]
         gfl_anchor_list, atss_anchor_list,valid_flag_list = self.anchor_generator(images, features)
@@ -1006,10 +1015,6 @@ class MY_GFLModule(torch.nn.Module):
         gt_bboxes,gt_labels=self.prepare_gt_box_and_class(images,targets)
         loss=self.loss(cls_score, bbox_pred,gt_bboxes,gt_labels,gfl_anchor_list,valid_flag_list,None)
         proposal=self.genernate_proposal(cls_score,bbox_pred,gfl_anchor_list, score_factors=None,rescale=False,with_nms=True,)
-        result=[]
-        for i in range(len(proposal)):
-            boxlist = Instances(images[i].size())
-            boxes = proposal[i][0]
-            boxlist.pred_boxes = Boxes(boxes[:,:4])
-            result.append(boxlist)
-        return result,loss
+        proposal=self.conver_proposals(images,proposal)
+
+        return proposal,loss
