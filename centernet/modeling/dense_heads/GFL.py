@@ -1002,9 +1002,10 @@ class MY_GFLModule(torch.nn.Module):
     def conver_proposals(self,images,proposal):
         result=[]
         for i in range(len(proposal)):
-            boxlist = Instances(images[i].size())
+            boxlist = Instances(images.image_sizes[i])
             boxes = proposal[i][0]
             boxlist.proposal_boxes = Boxes(boxes[:,:4])
+            boxlist.objectness_logits = boxes[:,4]
             result.append(boxlist)
         return result
 
