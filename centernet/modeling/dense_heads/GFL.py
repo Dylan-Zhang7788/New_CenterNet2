@@ -17,11 +17,42 @@ from mmdet.core.bbox.samplers.pseudo_sampler import PseudoSampler
 from mmdet.core.utils.dist_utils import reduce_mean
 from mmdet.core.utils.misc import select_single_mlvl,filter_scores_and_topk
 from mmdet.core.bbox.iou_calculators.iou2d_calculator import bbox_overlaps
-from mmdet.core.bbox.coder.distance_point_bbox_coder import DistancePointBBoxCoder
+from mmdet.core.bbox.coder.delta_xywh_bbox_coder import DeltaXYWHBBoxCoder
 from mmdet.models.builder import build_loss
+from mmdet.core.anchor.anchor_generator import AnchorGenerator
 from mmcv.ops import batched_nms
 from detectron2.structures import Instances, Boxes
+import numpy as np
+from torch import Tensor
 INF = 100000000
+
+
+def bbox_cxcywh_to_xyxy(bbox: Tensor) -> Tensor:
+    """Convert bbox coordinates from (cx, cy, w, h) to (x1, y1, x2, y2).
+
+    Args:
+        bbox (Tensor): Shape (n, 4) for bboxes.
+
+    Returns:
+        Tensor: Converted bboxes.
+    """
+    cx, cy, w, h = bbox.split((1, 1, 1, 1), dim=-1)
+    bbox_new = [(cx - 0.5 * w), (cy - 0.5 * h), (cx + 0.5 * w), (cy + 0.5 * h)]
+    return torch.cat(bbox_new, dim=-1)
+
+
+def bbox_xyxy_to_cxcywh(bbox: Tensor) -> Tensor:
+    """Convert bbox coordinates from (x1, y1, x2, y2) to (cx, cy, w, h).
+
+    Args:
+        bbox (Tensor): Shape (n, 4) for bboxes.
+
+    Returns:
+        Tensor: Converted bboxes.
+    """
+    x1, y1, x2, y2 = bbox.split((1, 1, 1, 1), dim=-1)
+    bbox_new = [(x1 + x2) / 2, (y1 + y2) / 2, (x2 - x1), (y2 - y1)]
+    return torch.cat(bbox_new, dim=-1)
 
 
 class BoxCoder(object):
@@ -239,6 +270,7 @@ class MY_GFLModule(torch.nn.Module):
         self.reg_max = 16
         self.num_classes=1
         self.strides=[(8, 8), (16, 16), (32, 32), (64, 64), (128, 128)]
+        self.pos_anchors=[]
         self.cls_out_channels=1
         loss_cls={'type': 'QualityFocalLoss', 'use_sigmoid': True, 'beta': 2.0, 'loss_weight': 1.0}
         loss_bbox={'type': 'GIoULoss', 'loss_weight': 2.0}
@@ -248,14 +280,20 @@ class MY_GFLModule(torch.nn.Module):
         self.loss_dfl = build_loss(loss_dfl)
         # num_classes = cfg.MODEL.ATSS.NUM_CLASSES - 1
         num_classes = 1 # 后面改的 写了固定值 只有正样本这一个类别
-        num_anchors = len(cfg.MODEL.ATSS.ASPECT_RATIOS) * cfg.MODEL.ATSS.SCALES_PER_OCTAVE
+        # num_anchors = len(cfg.MODEL.ATSS.ASPECT_RATIOS) * cfg.MODEL.ATSS.SCALES_PER_OCTAVE
+        num_anchors = 3
         in_channels=160 # 这个地方写了固定值后面出错的话要改
         self.box_coder = BoxCoder(cfg)
-        self.anchor_generator = make_anchor_generator_gfl(cfg)
+        # self.anchor_generator = make_anchor_generator_gfl(cfg)
+        self.prior_generator = AnchorGenerator(strides=[8, 16, 32],
+                                               ratios=[1.0,2.0,0.5],
+                                               scales_per_octave=1,
+                                               octave_base_scale=8
+                                               )
         self.assigner=ATSSAssigner(topk=9)
         self.sampler=PseudoSampler()
         self.integral = Integral(self.reg_max)
-        self.bbox_coder = DistancePointBBoxCoder()
+        self.bbox_coder = DeltaXYWHBBoxCoder()
         self.pos_weight=-1
         self.relu = nn.ReLU(inplace=True)
         self.cls_convs = nn.ModuleList()
@@ -412,6 +450,7 @@ class MY_GFLModule(torch.nn.Module):
                     anchor_list,
                     valid_flag_list,
                     gt_bboxes_list,
+                    img_metas,
                     gt_bboxes_ignore_list=None,
                     gt_labels_list=None,
                     label_channels=1,
@@ -422,7 +461,8 @@ class MY_GFLModule(torch.nn.Module):
         returning the targets as the parent method does, it also returns the
         anchors as the first element of the returned tuple.
         """
-        num_imgs = len(anchor_list) 
+        num_imgs = len(img_metas)
+        assert len(anchor_list) == len(valid_flag_list) == num_imgs
 
         # anchor number of multi levels
         num_level_anchors = [anchors.size(0) for anchors in anchor_list[0]]
@@ -448,6 +488,7 @@ class MY_GFLModule(torch.nn.Module):
              gt_bboxes_list,
              gt_bboxes_ignore_list,
              gt_labels_list,
+             img_metas,
              label_channels=label_channels,
              unmap_outputs=unmap_outputs)
         # no valid anchors
@@ -476,6 +517,7 @@ class MY_GFLModule(torch.nn.Module):
                            gt_bboxes,
                            gt_bboxes_ignore,
                            gt_labels,
+                           img_meta,
                            label_channels=1,
                            unmap_outputs=True):
         """Compute regression, classification targets for anchors in a single
@@ -515,8 +557,12 @@ class MY_GFLModule(torch.nn.Module):
                 neg_inds (Tensor): Indices of negative anchor with shape
                     (num_neg,).
         """
+        inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
+                                           img_meta['img_shape'][:2],
+                                           -1)
+        if not inside_flags.any():
+            return (None, ) * 7
         # assign gt and sample anchors
-        inside_flags=torch.ones_like(flat_anchors[:,0]).bool()
         anchors = flat_anchors[inside_flags, :]
 
         num_level_anchors_inside = self.get_num_level_anchors_inside(
@@ -538,10 +584,13 @@ class MY_GFLModule(torch.nn.Module):
 
         pos_inds = sampling_result.pos_inds
         neg_inds = sampling_result.neg_inds
+        self.pos_anchors=anchors[pos_inds]
         if len(pos_inds) > 0:
             pos_bbox_targets = sampling_result.pos_gt_bboxes
             bbox_targets[pos_inds, :] = pos_bbox_targets
             bbox_weights[pos_inds, :] = 1.0
+            self.pos_gt=pos_bbox_targets
+
             if gt_labels is None:
                 # Only rpn gives gt_labels as None
                 # Foreground is the first class
@@ -608,8 +657,7 @@ class MY_GFLModule(torch.nn.Module):
              bbox_preds,
              gt_bboxes,
              gt_labels,
-             anchor_list,
-             valid_flag_list,
+             img_metas,
              gt_bboxes_ignore=None):
         """Compute losses of the head.
 
@@ -631,14 +679,20 @@ class MY_GFLModule(torch.nn.Module):
             dict[str, Tensor]: A dictionary of loss components.
         """
 
+        featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
+        assert len(featmap_sizes) == self.prior_generator.num_levels
 
         device = cls_scores[0].device
+        anchor_list, valid_flag_list = self.get_anchors(
+            featmap_sizes, img_metas, device=device)
+        # label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
         label_channels = 1
 
         cls_reg_targets = self.get_targets(
             anchor_list,
             valid_flag_list,
             gt_bboxes,
+            img_metas,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
             label_channels=label_channels)
@@ -717,27 +771,27 @@ class MY_GFLModule(torch.nn.Module):
             pos_bbox_targets = bbox_targets[pos_inds]
             pos_bbox_pred = bbox_pred[pos_inds]
             pos_anchors = anchors[pos_inds]
-            pos_anchor_centers = self.anchor_center(pos_anchors) / stride[0]
+            # pos_anchor_centers = self.anchor_center(pos_anchors) / stride[0]
 
             weight_targets = cls_score.detach().sigmoid()
             weight_targets = weight_targets.max(dim=1)[0][pos_inds]
             pos_bbox_pred_corners = self.integral(pos_bbox_pred)
             pos_decode_bbox_pred = self.bbox_coder.decode(
-                pos_anchor_centers, pos_bbox_pred_corners)
-            pos_decode_bbox_targets = pos_bbox_targets / stride[0]
+                pos_anchors, pos_bbox_pred_corners)
+            # pos_decode_bbox_targets = pos_bbox_targets / stride[0]
             score[pos_inds] = bbox_overlaps(
                 pos_decode_bbox_pred.detach(),
-                pos_decode_bbox_targets,
+                pos_bbox_targets,
                 is_aligned=True)
             pred_corners = pos_bbox_pred.reshape(-1, self.reg_max + 1)
-            target_corners = self.bbox_coder.encode(pos_anchor_centers,
-                                                    pos_decode_bbox_targets,
+            target_corners = self.bbox_coder.encode(pos_anchors,
+                                                    pos_bbox_targets,
                                                     self.reg_max).reshape(-1)
 
             # regression loss
             loss_bbox = self.loss_bbox(
                 pos_decode_bbox_pred,
-                pos_decode_bbox_targets,
+                pos_bbox_targets,
                 weight=weight_targets,
                 avg_factor=1.0)
 
@@ -763,8 +817,9 @@ class MY_GFLModule(torch.nn.Module):
     def genernate_proposal(self,
                    cls_scores,
                    bbox_preds,
-                   anchor_list,
+                   img_metas=None,
                    score_factors=None,
+                   cfg=None,
                    rescale=False,
                    with_nms=True,
                    **kwargs):
@@ -813,11 +868,15 @@ class MY_GFLModule(torch.nn.Module):
         num_levels = len(cls_scores)
 
         featmap_sizes = [cls_scores[i].shape[-2:] for i in range(num_levels)]
-        mlvl_priors = anchor_list
+        mlvl_priors = self.prior_generator.grid_priors(
+            featmap_sizes,
+            dtype=cls_scores[0].dtype,
+            device=cls_scores[0].device)
 
         result_list = []
 
-        for img_id in range(len(anchor_list)):
+        for img_id in range(len(img_metas)):
+            img_meta = img_metas[img_id]
             cls_score_list = select_single_mlvl(cls_scores, img_id)
             bbox_pred_list = select_single_mlvl(bbox_preds, img_id)
             if with_score_factors:
@@ -827,7 +886,7 @@ class MY_GFLModule(torch.nn.Module):
 
             results = self._get_bboxes_single(cls_score_list, bbox_pred_list,
                                               score_factor_list, mlvl_priors,
-                                              rescale, with_nms,
+                                              img_meta, cfg, rescale, with_nms,
                                               **kwargs)
             result_list.append(results)
         return result_list
@@ -837,6 +896,8 @@ class MY_GFLModule(torch.nn.Module):
                            bbox_pred_list,
                            score_factor_list,
                            mlvl_priors,
+                           img_meta,
+                           cfg,
                            rescale=False,
                            with_nms=True,
                            **kwargs):
@@ -877,6 +938,7 @@ class MY_GFLModule(torch.nn.Module):
                     box with shape [num_bboxes].
         """
 
+        img_shape = img_meta['img_shape']
         nms_pre = self.cfg_gfl.get('nms_pre', -1)
 
         mlvl_bboxes = []
@@ -908,7 +970,7 @@ class MY_GFLModule(torch.nn.Module):
             priors = filtered_results['priors']
 
             bboxes = self.bbox_coder.decode(
-                self.anchor_center(priors), bbox_pred, max_shape=None)
+                self.anchor_center(priors), bbox_pred, max_shape=img_shape)
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
             mlvl_labels.append(labels)
@@ -999,7 +1061,7 @@ class MY_GFLModule(torch.nn.Module):
         else:
             return mlvl_bboxes, mlvl_scores, mlvl_labels
 
-    def conver_proposals(self,images,proposal):
+    def convert_proposals(self,images,proposal):
         result=[]
         for i in range(len(proposal)):
             boxlist = Instances(images.image_sizes[i])
@@ -1009,13 +1071,57 @@ class MY_GFLModule(torch.nn.Module):
             result.append(boxlist)
         return result
 
+    def get_anchors(self, featmap_sizes, img_metas, device='cuda'):
+        """Get anchors according to feature map sizes.
+
+        Args:
+            featmap_sizes (list[tuple]): Multi-level feature map sizes.
+            img_metas (list[dict]): Image meta info.
+            device (torch.device | str): Device for returned tensors
+
+        Returns:
+            tuple:
+                anchor_list (list[Tensor]): Anchors of each image.
+                valid_flag_list (list[Tensor]): Valid flags of each image.
+        """
+        num_imgs = len(img_metas)
+
+        # since feature map sizes of all images are the same, we only compute
+        # anchors for one time
+        multi_level_anchors = self.prior_generator.grid_priors(
+            featmap_sizes, device=device)
+        anchor_list = [multi_level_anchors for _ in range(num_imgs)]
+
+        # for each image, we compute valid flags of multi level anchors
+        valid_flag_list = []
+        for img_id, img_meta in enumerate(img_metas):
+            multi_level_flags = self.prior_generator.valid_flags(
+                featmap_sizes, img_meta['pad_shape'], device)
+            valid_flag_list.append(multi_level_flags)
+
+        return anchor_list, valid_flag_list
+
     def forward(self, images, features_dict, targets=None):
         features = [features_dict[f] for f in self.in_features]
-        gfl_anchor_list, atss_anchor_list,valid_flag_list = self.anchor_generator(images, features)
+        img_metas=[]
+        meta={}
+        for i , img_size in enumerate(images.image_sizes):
+            meta['img_shape']=img_size
+            meta['pad_shape']=tuple(images.tensor.shape[-2:])
+            img_metas.append(meta)
+
+        featmap_sizes = [featmap.size()[-2:] for featmap in features]
+        # gfl_anchor_list, atss_anchor_list,valid_flag_list = self.anchor_generator(images, features)
+        # gfl_anchor_list,valid_flag_list=self.get_anchors(featmap_sizes)
         cls_score, bbox_pred = multi_apply(self.forward_single, features, self.scales)
         gt_bboxes,gt_labels=self.prepare_gt_box_and_class(images,targets)
-        loss=self.loss(cls_score, bbox_pred,gt_bboxes,gt_labels,gfl_anchor_list,valid_flag_list,None)
-        proposal=self.genernate_proposal(cls_score,bbox_pred,gfl_anchor_list, score_factors=None,rescale=False,with_nms=True,)
-        proposal=self.conver_proposals(images,proposal)
+        loss=self.loss(cls_score, bbox_pred,gt_bboxes,gt_labels,img_metas,None)
+        proposal=self.genernate_proposal(cls_score,bbox_pred,img_metas, score_factors=None,rescale=False,with_nms=True,)
+        proposal=self.convert_proposals(images,proposal)
+        # result_anchor = torch.cat(tuple(anchor for i, anchor in enumerate(self.pos_anchors)), dim=0)
+        # result_anchor=bbox_cxcywh_to_xyxy(result_anchor)
+        anchorlist = Instances(images.image_sizes[0])
+        anchorlist.proposal_boxes = Boxes(self.pos_gt)
+        
 
-        return proposal,loss
+        return [anchorlist],loss

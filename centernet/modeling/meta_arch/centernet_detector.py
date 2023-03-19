@@ -40,7 +40,7 @@ class CenterNetDetector(nn.Module):
         from detectron2.utils.visualizer import Visualizer
 
         storage = get_event_storage()
-        max_vis_prop = 20
+        max_vis_prop = 2000
 
         for input, prop in zip(batched_inputs, proposals):
             img = input["image"]
@@ -64,6 +64,10 @@ class CenterNetDetector(nn.Module):
         if not self.training:
             return self.inference(batched_inputs)
         images = self.preprocess_image(batched_inputs)
+        # img=images
+        # img=np.asarray(img.tensor.cpu().permute(0,2,3,1)[0])
+        # import cv2
+        # cv2.imwrite("output/1.jpg",img)
         features = self.backbone(images.tensor)
         gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
 
