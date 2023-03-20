@@ -18,6 +18,7 @@ from mmdet.core.utils.dist_utils import reduce_mean
 from mmdet.core.utils.misc import select_single_mlvl,filter_scores_and_topk
 from mmdet.core.bbox.iou_calculators.iou2d_calculator import bbox_overlaps
 from mmdet.core.bbox.coder.delta_xywh_bbox_coder import DeltaXYWHBBoxCoder
+from mmdet.core import distance2bbox,bbox2distance
 from mmdet.models.builder import build_loss
 from mmdet.core.anchor.anchor_generator import AnchorGenerator
 from mmcv.ops import batched_nms
@@ -272,7 +273,15 @@ class MY_GFLModule(torch.nn.Module):
         self.strides=[(8, 8), (16, 16), (32, 32), (64, 64), (128, 128)]
         self.pos_anchors=[]
         self.cls_out_channels=1
-        loss_cls={'type': 'QualityFocalLoss', 'use_sigmoid': True, 'beta': 2.0, 'loss_weight': 1.0}
+
+        self.add_mean=True
+        self.reg_topk = 4
+        self.total_dim = self.reg_topk
+        if self.add_mean:
+            self.total_dim += 1
+        self.reg_channels = 64
+
+        loss_cls={'type': 'QualityFocalLoss', 'use_sigmoid': False, 'beta': 2.0, 'loss_weight': 1.0}
         loss_bbox={'type': 'GIoULoss', 'loss_weight': 2.0}
         loss_dfl=dict(type='DistributionFocalLoss', loss_weight=0.25)
         self.loss_cls = build_loss(loss_cls)
@@ -281,12 +290,12 @@ class MY_GFLModule(torch.nn.Module):
         # num_classes = cfg.MODEL.ATSS.NUM_CLASSES - 1
         num_classes = 1 # 后面改的 写了固定值 只有正样本这一个类别
         # num_anchors = len(cfg.MODEL.ATSS.ASPECT_RATIOS) * cfg.MODEL.ATSS.SCALES_PER_OCTAVE
-        num_anchors = 3
+        num_anchors = 1
         in_channels=160 # 这个地方写了固定值后面出错的话要改
         self.box_coder = BoxCoder(cfg)
         # self.anchor_generator = make_anchor_generator_gfl(cfg)
         self.prior_generator = AnchorGenerator(strides=[8, 16, 32],
-                                               ratios=[1.0,2.0,0.5],
+                                               ratios=[1.0],
                                                scales_per_octave=1,
                                                octave_base_scale=8
                                                )
@@ -310,9 +319,15 @@ class MY_GFLModule(torch.nn.Module):
         self.gfl_reg = nn.Conv2d(160, 4 * (self.reg_max + 1)*num_anchors, 3, padding=1)
         self.scales = nn.ModuleList([Scale(1.0) for _ in range(5)])
 
+        conf_vector = [nn.Conv2d(4 * self.total_dim, self.reg_channels, 1)]
+        conf_vector += [self.relu]
+        conf_vector += [nn.Conv2d(self.reg_channels, 1, 1), nn.Sigmoid()]
+
+        self.reg_conf = nn.Sequential(*conf_vector)
+        
         for modules in [self.cls_convs, self.reg_convs,
                         self.gfl_cls, self.gfl_reg ,
-                        self.scales]:
+                        self.scales,self.reg_conf]:
             for l in modules.modules():
                 if isinstance(l, nn.Conv2d):
                     torch.nn.init.normal_(l.weight, std=0.01)
@@ -648,8 +663,20 @@ class MY_GFLModule(torch.nn.Module):
             cls_feat = cls_conv(cls_feat)
         for reg_conv in self.reg_convs:
             reg_feat = reg_conv(reg_feat)
-        cls_score = self.gfl_cls(cls_feat)
+
         bbox_pred = scale(self.gfl_reg(reg_feat)).float()
+        N, C, H, W = bbox_pred.size()
+        prob = F.softmax(bbox_pred.reshape(N, 4, self.reg_max+1, H, W),dim=2)
+        prob_topk, _ = prob.topk(self.reg_topk, dim=2)
+
+        if self.add_mean:
+            stat = torch.cat([prob_topk, prob_topk.mean(dim=2, keepdim=True)],
+                             dim=2)
+        else:
+            stat = prob_topk
+
+        quality_score = self.reg_conf(stat.reshape(N, -1, H, W))
+        cls_score = self.gfl_cls(cls_feat).sigmoid() * quality_score
         return cls_score, bbox_pred
 
     def loss(self,
@@ -771,27 +798,27 @@ class MY_GFLModule(torch.nn.Module):
             pos_bbox_targets = bbox_targets[pos_inds]
             pos_bbox_pred = bbox_pred[pos_inds]
             pos_anchors = anchors[pos_inds]
-            # pos_anchor_centers = self.anchor_center(pos_anchors) / stride[0]
+            pos_anchor_centers = self.anchor_center(pos_anchors) / stride[0]
 
-            weight_targets = cls_score.detach().sigmoid()
+            weight_targets = cls_score.detach()
             weight_targets = weight_targets.max(dim=1)[0][pos_inds]
             pos_bbox_pred_corners = self.integral(pos_bbox_pred)
-            pos_decode_bbox_pred = self.bbox_coder.decode(
-                pos_anchors, pos_bbox_pred_corners)
-            # pos_decode_bbox_targets = pos_bbox_targets / stride[0]
+            pos_decode_bbox_pred = distance2bbox(pos_anchor_centers,
+                                                 pos_bbox_pred_corners)
+            pos_decode_bbox_targets = pos_bbox_targets / stride[0]
             score[pos_inds] = bbox_overlaps(
                 pos_decode_bbox_pred.detach(),
-                pos_bbox_targets,
+                pos_decode_bbox_targets,
                 is_aligned=True)
             pred_corners = pos_bbox_pred.reshape(-1, self.reg_max + 1)
-            target_corners = self.bbox_coder.encode(pos_anchors,
-                                                    pos_bbox_targets,
-                                                    self.reg_max).reshape(-1)
+            target_corners = bbox2distance(pos_anchor_centers,
+                                           pos_decode_bbox_targets,
+                                           self.reg_max).reshape(-1)
 
             # regression loss
             loss_bbox = self.loss_bbox(
                 pos_decode_bbox_pred,
-                pos_bbox_targets,
+                pos_decode_bbox_targets,
                 weight=weight_targets,
                 avg_factor=1.0)
 
@@ -804,7 +831,7 @@ class MY_GFLModule(torch.nn.Module):
         else:
             loss_bbox = bbox_pred.sum() * 0
             loss_dfl = bbox_pred.sum() * 0
-            weight_targets = bbox_pred.new_tensor(0)
+            weight_targets = torch.tensor(0).cuda()
 
         # cls (qfl) loss
         loss_cls = self.loss_cls(
@@ -954,7 +981,7 @@ class MY_GFLModule(torch.nn.Module):
             bbox_pred = self.integral(bbox_pred) * stride[0]
 
             scores = cls_score.permute(1, 2, 0).reshape(
-                -1, self.cls_out_channels).sigmoid()
+                -1, self.cls_out_channels)
 
             # After https://github.com/open-mmlab/mmdetection/pull/6268/,
             # this operation keeps fewer bboxes under the same `nms_pre`.
@@ -969,7 +996,7 @@ class MY_GFLModule(torch.nn.Module):
             bbox_pred = filtered_results['bbox_pred']
             priors = filtered_results['priors']
 
-            bboxes = self.bbox_coder.decode(
+            bboxes = distance2bbox(
                 self.anchor_center(priors), bbox_pred, max_shape=img_shape)
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
@@ -1120,8 +1147,8 @@ class MY_GFLModule(torch.nn.Module):
         proposal=self.convert_proposals(images,proposal)
         # result_anchor = torch.cat(tuple(anchor for i, anchor in enumerate(self.pos_anchors)), dim=0)
         # result_anchor=bbox_cxcywh_to_xyxy(result_anchor)
-        anchorlist = Instances(images.image_sizes[0])
-        anchorlist.proposal_boxes = Boxes(self.pos_gt)
+        # anchorlist = Instances(images.image_sizes[0])
+        # anchorlist.proposal_boxes = Boxes(self.pos_gt)
         
 
-        return [anchorlist],loss
+        return proposal,loss
