@@ -15,7 +15,8 @@ MODEL:
     NORM: "BN"
   FPN:
     IN_FEATURES: ["dla3", "dla4", "dla5"]
-  CENTERNET:  
+  CENTERNET: 
+    AS_PROPOSAL: True 
     IN_FEATURES: ["p3", "p4", "p5"]
     POST_NMS_TOPK_TEST: 128
     FPN_STRIDES: [8, 16, 32]
