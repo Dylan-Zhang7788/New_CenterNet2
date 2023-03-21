@@ -1084,7 +1084,7 @@ class MY_GFLModule(torch.nn.Module):
             if mlvl_bboxes.numel() == 0:
                 det_bboxes = torch.cat([mlvl_bboxes, mlvl_scores[:, None]], -1)
                 return det_bboxes, mlvl_labels
-            if self.train:
+            if self.training:
                 det_bboxes, keep_idxs = batched_nms(mlvl_bboxes, mlvl_scores,
                                                     mlvl_labels, self.cfg_gfl.get('nms_train'))
                 det_bboxes = det_bboxes[:self.cfg_gfl.get('max_per_img_train')]
@@ -1152,8 +1152,9 @@ class MY_GFLModule(torch.nn.Module):
         # gfl_anchor_list, atss_anchor_list,valid_flag_list = self.anchor_generator(images, features)
         # gfl_anchor_list,valid_flag_list=self.get_anchors(featmap_sizes)
         cls_score, bbox_pred = multi_apply(self.forward_single, features, self.scales)
-        gt_bboxes,gt_labels=self.prepare_gt_box_and_class(images,targets)
-        loss=self.loss(cls_score, bbox_pred,gt_bboxes,gt_labels,img_metas,None)
+        if self.training:
+            gt_bboxes,gt_labels=self.prepare_gt_box_and_class(images,targets)
+            loss=self.loss(cls_score, bbox_pred,gt_bboxes,gt_labels,img_metas,None)
         proposal=self.genernate_proposal(cls_score,bbox_pred,img_metas, score_factors=None,rescale=False,with_nms=True)
         proposal=self.convert_proposals(images,proposal)
         # result_anchor = torch.cat(tuple(anchor for i, anchor in enumerate(self.pos_anchors)), dim=0)
@@ -1161,5 +1162,7 @@ class MY_GFLModule(torch.nn.Module):
         # anchorlist = Instances(images.image_sizes[0])
         # anchorlist.proposal_boxes = Boxes(self.pos_gt)
 
-
-        return proposal,loss
+        if self.training:
+            return proposal,loss
+        else:
+            return proposal,{}
