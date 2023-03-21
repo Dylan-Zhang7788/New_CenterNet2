@@ -262,12 +262,15 @@ class MY_GFLModule(torch.nn.Module):
     def __init__(self, cfg, in_channels):
         super(MY_GFLModule, self).__init__()
         self.cfg = cfg
-        self.cfg_gfl = {'nms_pre': 1000, 
+        self.cfg_gfl = {'nms_pre': 2000, 
                         'min_bbox_size': 0, 
-                        'score_thr': 0.05, 
-                        'nms': {'type': 'nms', 'iou_threshold': 0.6}, 
-                        'max_per_img': 100}
-        self.in_features=("p3", "p4", "p5")
+                        'score_thr': 0.008, 
+                        'nms_train': {'type': 'nms', 'iou_threshold': 0.6}, 
+                        'nms_test': {'type': 'nms', 'iou_threshold': 0.8}, 
+                        'max_per_img_train': 2000,
+                        'max_per_img_test': 200
+                        }
+        self.in_features=("p3", "p4", "p5","p6","p7")
         self.reg_max = 16
         self.num_classes=1
         self.strides=[(8, 8), (16, 16), (32, 32), (64, 64), (128, 128)]
@@ -294,7 +297,7 @@ class MY_GFLModule(torch.nn.Module):
         in_channels=160 # 这个地方写了固定值后面出错的话要改
         self.box_coder = BoxCoder(cfg)
         # self.anchor_generator = make_anchor_generator_gfl(cfg)
-        self.prior_generator = AnchorGenerator(strides=[8, 16, 32],
+        self.prior_generator = AnchorGenerator(strides=[8, 16, 32, 64, 128],
                                                ratios=[1.0],
                                                scales_per_octave=1,
                                                octave_base_scale=8
@@ -457,6 +460,7 @@ class MY_GFLModule(torch.nn.Module):
         for i in range(len(image_list)):
             gt_bboxes_per_img = targets[i].gt_boxes.tensor
             gt_labels_per_img = targets[i].gt_classes
+            gt_labels_per_img = torch.zeros_like(gt_labels_per_img)
             gt_bboxes.append(gt_bboxes_per_img)
             gt_labels.append(gt_labels_per_img)
         return gt_bboxes,gt_labels,
@@ -1001,7 +1005,8 @@ class MY_GFLModule(torch.nn.Module):
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
             mlvl_labels.append(labels)
-
+        # return mlvl_bboxes, mlvl_scores, mlvl_labels
+    
         return self._bbox_post_process(
             mlvl_scores,
             mlvl_labels,
@@ -1079,11 +1084,17 @@ class MY_GFLModule(torch.nn.Module):
             if mlvl_bboxes.numel() == 0:
                 det_bboxes = torch.cat([mlvl_bboxes, mlvl_scores[:, None]], -1)
                 return det_bboxes, mlvl_labels
+            if self.train:
+                det_bboxes, keep_idxs = batched_nms(mlvl_bboxes, mlvl_scores,
+                                                    mlvl_labels, self.cfg_gfl.get('nms_train'))
+                det_bboxes = det_bboxes[:self.cfg_gfl.get('max_per_img_train')]
+                det_labels = mlvl_labels[keep_idxs][:self.cfg_gfl.get('max_per_img_train')]    
+            else:
+                det_bboxes, keep_idxs = batched_nms(mlvl_bboxes, mlvl_scores,
+                                                    mlvl_labels, self.cfg_gfl.get('nms_test'))
+                det_bboxes = det_bboxes[:self.cfg_gfl.get('max_per_img_test')]
+                det_labels = mlvl_labels[keep_idxs][:self.cfg_gfl.get('max_per_img_test')] 
 
-            det_bboxes, keep_idxs = batched_nms(mlvl_bboxes, mlvl_scores,
-                                                mlvl_labels, self.cfg_gfl.get('nms'))
-            det_bboxes = det_bboxes[:self.cfg_gfl.get('max_per_img')]
-            det_labels = mlvl_labels[keep_idxs][:self.cfg_gfl.get('max_per_img')]
             return det_bboxes, det_labels
         else:
             return mlvl_bboxes, mlvl_scores, mlvl_labels
@@ -1143,12 +1154,12 @@ class MY_GFLModule(torch.nn.Module):
         cls_score, bbox_pred = multi_apply(self.forward_single, features, self.scales)
         gt_bboxes,gt_labels=self.prepare_gt_box_and_class(images,targets)
         loss=self.loss(cls_score, bbox_pred,gt_bboxes,gt_labels,img_metas,None)
-        proposal=self.genernate_proposal(cls_score,bbox_pred,img_metas, score_factors=None,rescale=False,with_nms=True,)
+        proposal=self.genernate_proposal(cls_score,bbox_pred,img_metas, score_factors=None,rescale=False,with_nms=True)
         proposal=self.convert_proposals(images,proposal)
         # result_anchor = torch.cat(tuple(anchor for i, anchor in enumerate(self.pos_anchors)), dim=0)
         # result_anchor=bbox_cxcywh_to_xyxy(result_anchor)
         # anchorlist = Instances(images.image_sizes[0])
         # anchorlist.proposal_boxes = Boxes(self.pos_gt)
-        
+
 
         return proposal,loss
