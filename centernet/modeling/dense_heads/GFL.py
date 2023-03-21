@@ -439,7 +439,7 @@ class MY_GFLModule(torch.nn.Module):
                 reg_targets.append(reg_targets_per_im)
 
             return cls_labels, reg_targets
-
+    @torch.no_grad()
     def anchor_center(self, anchors):
         """Get anchor centers from anchors.
 
@@ -452,7 +452,7 @@ class MY_GFLModule(torch.nn.Module):
         anchors_cx = (anchors[..., 2] + anchors[..., 0]) / 2
         anchors_cy = (anchors[..., 3] + anchors[..., 1]) / 2
         return torch.stack([anchors_cx, anchors_cy], dim=-1)
-
+    @torch.no_grad()
     def prepare_gt_box_and_class(self,image_list,targets):
         gt_bboxes = []
         gt_labels = []
@@ -465,6 +465,7 @@ class MY_GFLModule(torch.nn.Module):
             gt_labels.append(gt_labels_per_img)
         return gt_bboxes,gt_labels,
 
+    @torch.no_grad()
     def get_targets(self,
                     anchor_list,
                     valid_flag_list,
@@ -529,6 +530,7 @@ class MY_GFLModule(torch.nn.Module):
                 bbox_targets_list, bbox_weights_list, num_total_pos,
                 num_total_neg)
 
+    @torch.no_grad()
     def _get_target_single(self,
                            flat_anchors,
                            valid_flags,
@@ -638,6 +640,7 @@ class MY_GFLModule(torch.nn.Module):
         return (anchors, labels, label_weights, bbox_targets, bbox_weights,
                 pos_inds, neg_inds)
 
+    @torch.no_grad()
     def get_num_level_anchors_inside(self, num_level_anchors, inside_flags):
             split_inside_flags = torch.split(inside_flags, num_level_anchors)
             num_level_anchors_inside = [
@@ -845,6 +848,7 @@ class MY_GFLModule(torch.nn.Module):
 
         return loss_cls, loss_bbox, loss_dfl, weight_targets.sum()
 
+    @torch.no_grad()
     def genernate_proposal(self,
                    cls_scores,
                    bbox_preds,
@@ -922,6 +926,7 @@ class MY_GFLModule(torch.nn.Module):
             result_list.append(results)
         return result_list
 
+    @torch.no_grad()
     def _get_bboxes_single(self,
                            cls_score_list,
                            bbox_pred_list,
@@ -1016,6 +1021,7 @@ class MY_GFLModule(torch.nn.Module):
             rescale=False,
             with_nms=with_nms)
 
+    @torch.no_grad()
     def _bbox_post_process(self,
                            mlvl_scores,
                            mlvl_labels,
@@ -1099,6 +1105,7 @@ class MY_GFLModule(torch.nn.Module):
         else:
             return mlvl_bboxes, mlvl_scores, mlvl_labels
 
+    @torch.no_grad()
     def convert_proposals(self,images,proposal):
         result=[]
         for i in range(len(proposal)):
@@ -1109,6 +1116,7 @@ class MY_GFLModule(torch.nn.Module):
             result.append(boxlist)
         return result
 
+    @torch.no_grad()
     def get_anchors(self, featmap_sizes, img_metas, device='cuda'):
         """Get anchors according to feature map sizes.
 
