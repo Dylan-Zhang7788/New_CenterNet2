@@ -1,5 +1,5 @@
 MODEL:
-  META_ARCHITECTURE: "CenterNetDetector_value"
+  META_ARCHITECTURE: "CenterNetDetector"
   PROPOSAL_GENERATOR:
     NAME: "MY_GFLModule"
   BACKBONE:
@@ -41,5 +41,5 @@ INPUT:
   MAX_SIZE_TRAIN: 900
   MAX_SIZE_TEST: 736
   MIN_SIZE_TEST: 512
-  # CUSTOM_AUG: 'EfficientDetResizeCrop'
+  CUSTOM_AUG: 'EfficientDetResizeCrop'
 OUTPUT_DIR: "./output-MY-GFL-BiFPN-balloon"
