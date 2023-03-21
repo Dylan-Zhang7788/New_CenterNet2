@@ -1,5 +1,5 @@
 MODEL:
-  META_ARCHITECTURE: "CenterNetDetector"
+  META_ARCHITECTURE: "CenterNetDetector_value"
   PROPOSAL_GENERATOR:
     NAME: "MY_GFLModule"
   BACKBONE:

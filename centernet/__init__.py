@@ -1,4 +1,5 @@
 from .modeling.meta_arch.centernet_detector import CenterNetDetector
+from .modeling.meta_arch.centernet_detector_value import CenterNetDetector_value
 from .modeling.dense_heads.centernet import CenterNet
 from .modeling.roi_heads.custom_roi_heads import CustomROIHeads, CustomCascadeROIHeads
 from .modeling.dense_heads.atss import MY_ATSSModule
