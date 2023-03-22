@@ -1,14 +1,14 @@
-_BASE_: "Base-CenterNet2.yaml"
+_BASE_: ".Base-CenterNet2.yaml"
 MODEL:
   PROPOSAL_GENERATOR:
     NAME: "MY_GFLModule"
   BACKBONE:
     # NAME: "MY_build_p37_fcos_dla_bifpn_backbone"
-    NAME: "build_p37_dla_bifpn_backbone"
+    NAME: "build_p35_fcos_dla_bifpn_backbone"
   BIFPN:
     OUT_CHANNELS: 160
-    NUM_LEVELS: 5
-    NUM_BIFPN: 3
+    NUM_LEVELS: 3
+    NUM_BIFPN: 4
   CENTERNET:
     POST_NMS_TOPK_TEST: 128
   ATSS:

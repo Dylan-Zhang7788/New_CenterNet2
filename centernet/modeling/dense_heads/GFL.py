@@ -270,10 +270,10 @@ class MY_GFLModule(torch.nn.Module):
                         'max_per_img_train': 2000,
                         'max_per_img_test': 200
                         }
-        self.in_features=("p3", "p4", "p5","p6","p7")
+        self.in_features=("p3", "p4", "p5")
         self.reg_max = 16
         self.num_classes=1
-        self.strides=[(8, 8), (16, 16), (32, 32), (64, 64), (128, 128)]
+        self.strides=[(8, 8), (16, 16), (32, 32)]
         self.pos_anchors=[]
         self.cls_out_channels=1
 
@@ -297,7 +297,7 @@ class MY_GFLModule(torch.nn.Module):
         in_channels=160 # 这个地方写了固定值后面出错的话要改
         self.box_coder = BoxCoder(cfg)
         # self.anchor_generator = make_anchor_generator_gfl(cfg)
-        self.prior_generator = AnchorGenerator(strides=[8, 16, 32, 64, 128],
+        self.prior_generator = AnchorGenerator(strides=[8, 16, 32],
                                                ratios=[1.0],
                                                scales_per_octave=1,
                                                octave_base_scale=8
