@@ -4,6 +4,7 @@ from .modeling.dense_heads.centernet import CenterNet
 from .modeling.roi_heads.custom_roi_heads import CustomROIHeads, CustomCascadeROIHeads
 from .modeling.dense_heads.atss import MY_ATSSModule
 from .modeling.dense_heads.GFL import MY_GFLModule
+from .modeling.dense_heads.GFL_anchor import MY_GFLModule_Anchor
 
 from .modeling.backbone.fpn_p5 import build_p67_resnet_fpn_backbone
 from .modeling.backbone.dla import build_dla_backbone
