@@ -442,7 +442,7 @@ class MY_PSPModule(nn.Module):
         center = torch.cat(priors, -1)
         return center
 
-class MY_PAN_BiFPN(Backbone):
+class MY_PAN_BiFPN_P35(Backbone):
     """
     This module implements Feature Pyramid Network.
     It creates pyramid features built on top of some input feature maps.
@@ -466,7 +466,7 @@ class MY_PAN_BiFPN(Backbone):
             num_repeats (int): the number of repeats of MY_CBAM_BiFPN.
             norm (str): the normalization to use.
         """
-        super(MY_PAN_BiFPN, self).__init__()
+        super(MY_PAN_BiFPN_P35, self).__init__()
         assert isinstance(bottom_up, Backbone)
         # add extra feature levels (i.e., 6 and 7)
         self.bottom_up = BackboneWithTopLevels(
@@ -552,9 +552,9 @@ class MY_PAN_BiFPN(Backbone):
         feats_value=[]
         feats_key=[]
         for i, bifpn in enumerate(self.repeated_bifpn):
-            feats = bifpn(feats)
-            if i <= 1 : pass 
+            if i <= 2 : pass 
             else:
+                feats = bifpn(feats)
                 for j,feat in enumerate(feats):
                     if j==0:
                         feat_upsample=self.upsample(feat)
@@ -667,7 +667,7 @@ def MY_build_p35_fcos_dla_bifpn_attention_backbone(cfg, input_shape: ShapeSpec):
     return backbone
 
 @BACKBONE_REGISTRY.register()
-def MY_build_p37_fcos_dla_bifpn_backbone(cfg, input_shape: ShapeSpec):
+def MY_build_p35_fcos_dla_bifpn_backbone(cfg, input_shape: ShapeSpec):
     """
     Args:
         cfg: a detectron2 CfgNode
@@ -678,10 +678,10 @@ def MY_build_p37_fcos_dla_bifpn_backbone(cfg, input_shape: ShapeSpec):
     in_features = cfg.MODEL.FPN.IN_FEATURES
     out_channels = cfg.MODEL.BIFPN.OUT_CHANNELS
     num_repeats = cfg.MODEL.BIFPN.NUM_BIFPN
-    assert cfg.MODEL.BIFPN.NUM_LEVELS == 5
-    top_levels = 2
+    assert cfg.MODEL.BIFPN.NUM_LEVELS == 3
+    top_levels = 0
 
-    backbone = MY_PAN_BiFPN(
+    backbone = MY_PAN_BiFPN_P35(
         bottom_up=bottom_up,
         in_features=in_features,
         out_channels=out_channels,
