@@ -98,7 +98,7 @@ class MY_COCOeval(COCOeval):
             summarize = _summarizeKps
         self.stats = summarize()
         if self.Writer is not None:
-            self.MY_put_scalar(self.stats)
+            self.MY_put_scalar(self.stats,iouType)
 
 class MY_COCOevalMaxDets(MY_COCOeval):
     def __init__(self,cocoGt=None, cocoDt=None, iouType='segm',*,Writer):
