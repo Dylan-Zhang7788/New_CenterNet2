@@ -11,19 +11,19 @@ class MY_COCOeval(COCOeval):
     def __init__(self,cocoGt=None, cocoDt=None, iouType='segm',*,Writer):
         super().__init__(cocoGt,cocoDt,iouType)
         self.Writer=Writer
-    def MY_put_scalar(self,stats):
-        self.Writer.put_scalar('AP IoU=0.50:0.95',stats[0])
-        self.Writer.put_scalar('AP IoU=0.50',stats[1])
-        self.Writer.put_scalar('AP IoU=0.75',stats[2])
-        self.Writer.put_scalar('AP IoU=0.50:0.95,area= small',stats[3])
-        self.Writer.put_scalar('AP IoU=0.50:0.95,area= medium',stats[4])
-        self.Writer.put_scalar('AP IoU=0.50:0.95,area= large',stats[5])
-        self.Writer.put_scalar('AR IoU=0.50:0.95,maxDets= 1',stats[6])
-        self.Writer.put_scalar('AR IoU=0.50:0.95,maxDets= 10',stats[7])
-        self.Writer.put_scalar('AR IoU=0.50:0.95,maxDets=100',stats[8])
-        self.Writer.put_scalar('AP IoU=0.50:0.95,area= small',stats[9])
-        self.Writer.put_scalar('AP IoU=0.50:0.95,area= medium',stats[10])
-        self.Writer.put_scalar('AP IoU=0.50:0.95,area= large',stats[11])
+    def MY_put_scalar(self,stats,iouType):
+        self.Writer.put_scalar('{} AP IoU=0.50:0.95'.format(iouType).format(iouType),stats[0])
+        self.Writer.put_scalar('{} AP IoU=0.50'.format(iouType),stats[1])
+        self.Writer.put_scalar('{} AP IoU=0.75'.format(iouType),stats[2])
+        self.Writer.put_scalar('{} AP IoU=0.50:0.95,area= small'.format(iouType),stats[3])
+        self.Writer.put_scalar('{} AP IoU=0.50:0.95,area= medium'.format(iouType),stats[4])
+        self.Writer.put_scalar('{} AP IoU=0.50:0.95,area= large'.format(iouType),stats[5])
+        self.Writer.put_scalar('{} AR IoU=0.50:0.95,maxDets= 1'.format(iouType),stats[6])
+        self.Writer.put_scalar('{} AR IoU=0.50:0.95,maxDets= 10'.format(iouType),stats[7])
+        self.Writer.put_scalar('{} AR IoU=0.50:0.95,maxDets=100'.format(iouType),stats[8])
+        self.Writer.put_scalar('{} AP IoU=0.50:0.95,area= small'.format(iouType),stats[9])
+        self.Writer.put_scalar('{} AP IoU=0.50:0.95,area= medium'.format(iouType),stats[10])
+        self.Writer.put_scalar('{} AP IoU=0.50:0.95,area= large'.format(iouType),stats[11])
 
     def summarize(self):
         '''
