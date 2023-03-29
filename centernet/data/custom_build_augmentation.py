@@ -17,7 +17,7 @@ from detectron2.structures import (
 )
 
 from detectron2.data import transforms as T
-from .transforms.custom_augmentation_impl import EfficientDetResizeCrop
+from .transforms.custom_augmentation_impl import *
 
 def build_custom_augmentation(cfg, is_train):
     """
@@ -45,11 +45,28 @@ def build_custom_augmentation(cfg, is_train):
             scale = (1, 1)
             size = cfg.INPUT.TEST_SIZE
         augmentation = [EfficientDetResizeCrop(size, scale)]
+    elif cfg.INPUT.CUSTOM_AUG == 'MY_AUG':
+        if is_train:
+            scale = cfg.INPUT.SCALE_RANGE
+            size = cfg.INPUT.TRAIN_SIZE
+            augmentation=[]
+            augmentation.append(T.RandomBrightness(0.3, 1.7))
+            augmentation.append(T.RandomContrast(0.3, 1.7))
+            augmentation.append(T.RandomSaturation(0.3, 1.7))
+            # augmentation.append(RandomErasing())
+            augmentation.append(RandomNoise())
+            augmentation.append(T.RandomRotation([-25,25]))
+            augmentation.append(EfficientDetResizeCrop(size, scale))
+            # augmentation.append(RandomAffine(prob=0.4))
+        else:
+            scale = (1, 1)
+            size = cfg.INPUT.TEST_SIZE
+            augmentation = [EfficientDetResizeCrop(size, scale)]
     else:
         assert 0, cfg.INPUT.CUSTOM_AUG
 
     if is_train:
-        augmentation.append(T.RandomFlip())
+        augmentation.append(T.RandomFlip(prob=0.5, horizontal=True, vertical=False))     
     return augmentation
 
 

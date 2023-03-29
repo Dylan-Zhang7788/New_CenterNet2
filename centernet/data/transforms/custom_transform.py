@@ -14,6 +14,8 @@ from fvcore.transforms.transform import (
     TransformList,
 )
 from PIL import Image
+import random
+import math
 
 try:
     import cv2  # noqa
@@ -92,3 +94,76 @@ class EfficientDetResizeCropTransform(Transform):
     def inverse(self):
         raise NotImplementedError
         # return ResizeTransform(self.new_h, self.new_w, self.h, self.w, self.interp)
+
+class RandomErasingTransform(Transform):
+    def __init__(self, probability=0.5, sl = 0.02, sh = 0.4, r1 = 0.3, mean=[0.4914, 0.4822, 0.4465]):
+        self.probability = probability
+        self.sl = sl
+        self.sh = sh
+        self.r1 = r1
+        self.mean = mean
+
+    def apply_image(self, img):
+        if random.uniform(0, 1) > self.probability:
+            return img
+
+        for attempt in range(100):
+            area = img.shape[0] * img.shape[1]
+       
+            target_area = random.uniform(self.sl, self.sh) * area
+            aspect_ratio = random.uniform(self.r1, 1/self.r1)
+
+            h = int(round(math.sqrt(target_area * aspect_ratio)))
+            w = int(round(math.sqrt(target_area / aspect_ratio)))
+
+            if w < img.shape[1] and h < img.shape[0]:
+                x1 = random.randint(0, img.shape[0] - h)
+                y1 = random.randint(0, img.shape[1] - w)
+                if img.shape[2] == 3:
+                    img[x1:x1+h, y1:y1+w,0] = random.uniform(0, 1)
+                    img[x1:x1+h, y1:y1+w,1] = random.uniform(0, 1)
+                    img[x1:x1+h, y1:y1+w,2] = random.uniform(0, 1)
+                    # img[x1:x1+h, y1:y1+w,0] = self.mean[0]
+                    # img[x1:x1+h, y1:y1+w,1] = self.mean[1]
+                    # img[x1:x1+h, y1:y1+w,2] = self.mean[2]
+                else:
+                    img[x1:x1+h, y1:y1+w,0] = self.mean[1]
+                return img
+
+    def apply_coords(self, coords):
+        return coords
+
+    def apply_segmentation(self, segmentation):
+        return segmentation
+
+    def apply_polygons(self, polygons):
+        return polygons
+
+class RandomNoiseTransform(Transform):
+    def __init__(self, probability=0.5, noise_type='gaussian', mean=0, std=0.05):
+        self.probability = probability
+        self.noise_type = noise_type
+        self.mean = mean
+        self.std = std
+
+    def apply_image(self, image):
+        if random.random() < self.probability:
+            if self.noise_type == 'gaussian':
+                noise = np.random.normal(self.mean, self.std, size=image.shape)*255
+                noise = noise.astype(np.uint8)
+            elif self.noise_type == 'salt_and_pepper':
+                noise = np.random.choice([0, 1], size=image.shape, p=[0.5, 0.5])
+                noise = noise * 255
+            else:
+                noise = np.zeros_like(image)
+            image = np.clip(image + noise, 0, 255)
+        return image
+
+    def apply_coords(self, coords):
+        return coords
+
+    def apply_segmentation(self, segmentation):
+        return segmentation
+
+    def apply_polygons(self, polygons):
+        return polygons

@@ -5,6 +5,8 @@
 Implement many useful :class:`Augmentation`.
 """
 import numpy as np
+import torch
+from detectron2.data import detection_utils as utils
 import sys
 from fvcore.transforms.transform import (
     BlendTransform,
@@ -17,10 +19,12 @@ from fvcore.transforms.transform import (
 from PIL import Image
 
 from detectron2.data.transforms.augmentation import Augmentation
-from .custom_transform import EfficientDetResizeCropTransform
+from .custom_transform import EfficientDetResizeCropTransform, RandomErasingTransform,RandomNoiseTransform
 
 __all__ = [
     "EfficientDetResizeCrop",
+    "RandomNoise",
+    "RandomErasing",
 ]
 
 
@@ -61,3 +65,26 @@ class EfficientDetResizeCrop(Augmentation):
         offset_x = int(max(0.0, float(offset_x)) * np.random.uniform(0, 1))
         return EfficientDetResizeCropTransform(
             scaled_h, scaled_w, offset_y, offset_x, img_scale, self.target_size, self.interp)
+
+class RandomErasing(Augmentation):
+    def __init__(self, probability=0.5, sl = 0.02, sh = 0.4, r1 = 0.3, mean=[0.4914, 0.4822, 0.4465]):
+        super().__init__()
+        self.probability = probability
+        self.sl = sl
+        self.sh = sh
+        self.r1 = r1
+        self.mean = mean
+
+    def get_transform(self, image):
+        return RandomErasingTransform(self.probability, self.sl, self.sh, self.r1, self.mean)
+    
+class RandomNoise(Augmentation):
+    def __init__(self, probability=0.5, noise_type='gaussian', mean=0, std=0.02):
+        super().__init__()
+        self.probability = probability
+        self.noise_type = noise_type
+        self.mean = mean
+        self.std = std
+
+    def get_transform(self, image):
+        return RandomNoiseTransform(self.probability, self.noise_type, self.mean, self.std)
