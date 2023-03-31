@@ -2,7 +2,7 @@ _BASE_: "../Base-CenterNet2.yaml"
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
   BACKBONE:
-    NAME: "MY_build_p35_fcos_dla_bifpn_pan_backbone"
+    NAME: "build_p35_fcos_dla_bifpn_backbone"
   PROPOSAL_GENERATOR:
     NAME: "MY_GFLModule"
   BIFPN:

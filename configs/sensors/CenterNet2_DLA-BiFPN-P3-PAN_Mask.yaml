@@ -4,7 +4,7 @@ MODEL:
   BACKBONE:
     NAME: "MY_build_p35_fcos_dla_bifpn_pan_backbone"
   PROPOSAL_GENERATOR:
-    NAME: "MY_GFLModule"
+    NAME: "CenterNet"
   BIFPN:
     OUT_CHANNELS: 160
     NUM_LEVELS: 3
