@@ -264,7 +264,7 @@ class MY_GFLModule(torch.nn.Module):
         self.cfg = cfg
         self.cfg_gfl = {'nms_pre': 2000, 
                         'min_bbox_size': 0, 
-                        'score_thr': 0.008, 
+                        'score_thr': 0.005, # 这个地方原本是0.008 第一次修改：0.005
                         'nms_train': {'type': 'nms', 'iou_threshold': 0.6}, 
                         'nms_test': {'type': 'nms', 'iou_threshold': 0.8}, 
                         'max_per_img_train': 2000,

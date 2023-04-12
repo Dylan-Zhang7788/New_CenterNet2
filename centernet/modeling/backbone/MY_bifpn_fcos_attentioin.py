@@ -737,7 +737,7 @@ class MY_PAN_BiFPN_P35(Backbone):
         feats_key=[]
         for i, bifpn in enumerate(self.repeated_bifpn):
             feats = bifpn(feats)
-            if i <= 3 : pass 
+            if i <= 2 : pass 
             else:
                 for j,feat in enumerate(feats):
                     if j==0:
@@ -883,9 +883,9 @@ class MY_PAN_BiFPN_P37(Backbone):
         feats_value=[]
         feats_key=[]
         for i, bifpn in enumerate(self.repeated_bifpn):
-            if i <= 2 : pass 
+            feats = bifpn(feats)
+            if i <= 1 : pass 
             else:
-                feats = bifpn(feats)
                 for j,feat in enumerate(feats):
                     if j==0:
                         feat_upsample=self.upsample(feat)
@@ -1090,8 +1090,8 @@ def MY_build_p37_fcos_dla_bifpn_pan_cbam_backbone(cfg, input_shape: ShapeSpec):
     in_features = cfg.MODEL.FPN.IN_FEATURES
     out_channels = cfg.MODEL.BIFPN.OUT_CHANNELS
     num_repeats = cfg.MODEL.BIFPN.NUM_BIFPN
-    assert cfg.MODEL.BIFPN.NUM_LEVELS == 3
-    top_levels = 0
+    assert cfg.MODEL.BIFPN.NUM_LEVELS == 5
+    top_levels = 2
 
     backbone = MY_PAN_BiFPN_P37(
         bottom_up=bottom_up,
@@ -1100,10 +1100,35 @@ def MY_build_p37_fcos_dla_bifpn_pan_cbam_backbone(cfg, input_shape: ShapeSpec):
         num_top_levels=top_levels,
         num_repeats=num_repeats,
         norm=cfg.MODEL.BIFPN.NORM,
-        cbam=True
+        cbam=False
     )
     return backbone
 
+@BACKBONE_REGISTRY.register()
+def MY_build_p37_fcos_resnet_bifpn_pan_cbam_backbone(cfg, input_shape: ShapeSpec):
+    """
+    Args:
+        cfg: a detectron2 CfgNode
+    Returns:
+        backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
+    """
+    bottom_up = build_resnet_backbone(cfg, input_shape)
+    in_features = cfg.MODEL.FPN.IN_FEATURES
+    out_channels = cfg.MODEL.BIFPN.OUT_CHANNELS
+    num_repeats = cfg.MODEL.BIFPN.NUM_BIFPN
+    assert cfg.MODEL.BIFPN.NUM_LEVELS == 5
+    top_levels = 2
+
+    backbone = MY_PAN_BiFPN_P37(
+        bottom_up=bottom_up,
+        in_features=in_features,
+        out_channels=out_channels,
+        num_top_levels=top_levels,
+        num_repeats=num_repeats,
+        norm=cfg.MODEL.BIFPN.NORM,
+        cbam=False
+    )
+    return backbone
 # 到这里为止 是sensors论文的build_backbone
 
 @BACKBONE_REGISTRY.register()
